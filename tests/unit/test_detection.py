@@ -1,12 +1,12 @@
 """Unit tests for PsutilGameDetector — no real psutil scanning."""
+
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 from unittest.mock import MagicMock
 
 import psutil
-import pytest
 
 from poe2_rpc.infrastructure.detection import PsutilGameDetector
 from poe2_rpc.infrastructure.settings import AppSettings
@@ -21,6 +21,7 @@ def _make_process(name: str, exe: str) -> MagicMock:
 def _fake_iter(*processes: MagicMock):
     def _factory(attrs: list[str]) -> Iterator[MagicMock]:
         return iter(processes)
+
     return _factory
 
 
@@ -39,9 +40,6 @@ def test_detector_returns_none_when_process_absent() -> None:
 
 
 def test_detector_skips_inaccessible_processes() -> None:
-    bad_proc = MagicMock()
-    bad_proc.info = {"name": "PathOfExileSteam.exe", "exe": r"C:/Games/PoE2/PathOfExileSteam.exe"}
-    bad_proc.info  # access once to set up
     # Make the bad proc raise NoSuchProcess when .info is accessed via iteration
     # We simulate this by having the factory raise on first item
     good_proc = _make_process("PathOfExileSteam.exe", r"C:/Games/PoE2/PathOfExileSteam.exe")

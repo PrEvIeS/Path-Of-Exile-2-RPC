@@ -1,10 +1,12 @@
 """Unit tests for PypresencePublisher.publish (C-7b)."""
+
 from __future__ import annotations
 
-import pytest
 import pypresence.exceptions as pex
+import pytest
 
 from poe2_rpc.domain.models import InstanceInfo, LevelInfo
+from poe2_rpc.infrastructure.presence import PypresencePublisher
 from poe2_rpc.infrastructure.settings import AppSettings
 
 
@@ -70,8 +72,6 @@ async def test_publish_calls_aiopresence_update_once_on_success(
     level_info: LevelInfo,
     instance_info: InstanceInfo,
 ) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     fake = FakeAioPresence("test-app-id")
     publisher = PypresencePublisher(settings, presence_factory=lambda cid: fake)  # type: ignore[arg-type]
     publisher._presence = fake  # inject already-connected presence
@@ -88,8 +88,6 @@ async def test_publish_retries_3_times_on_discorderror(
     instance_info: InstanceInfo,
     mocker: object,
 ) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     mocker.patch("asyncio.sleep")  # type: ignore[union-attr]
 
     fake = FakeAioPresence("test-app-id")
@@ -110,8 +108,6 @@ async def test_publish_reraises_after_3_attempts(
     instance_info: InstanceInfo,
     mocker: object,
 ) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     mocker.patch("asyncio.sleep")  # type: ignore[union-attr]
 
     fake = FakeAioPresence("test-app-id")
@@ -131,8 +127,6 @@ async def test_publish_does_not_share_retry_state_with_connect(
     level_info: LevelInfo,
     instance_info: InstanceInfo,
 ) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     fake = FakeAioPresence("test-app-id")
     publisher = PypresencePublisher(settings, presence_factory=lambda cid: fake)  # type: ignore[arg-type]
     publisher._presence = fake

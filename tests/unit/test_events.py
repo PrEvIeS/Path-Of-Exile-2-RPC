@@ -1,10 +1,17 @@
 """Tests for domain event hierarchy."""
+
 from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from poe2_rpc.domain.events import AreaEntered, CharacterLevelChanged, DomainEvent, GameStarted, GameStopped
+from poe2_rpc.domain.events import (
+    AreaEntered,
+    CharacterLevelChanged,
+    DomainEvent,
+    GameStarted,
+    GameStopped,
+)
 from poe2_rpc.domain.models import InstanceInfo, LevelInfo
 
 

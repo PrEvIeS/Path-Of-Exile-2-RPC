@@ -1,8 +1,10 @@
 """Unit tests for BundledLocationCatalog."""
+
 from __future__ import annotations
 
 import json
 
+import httpx
 import pytest
 
 from poe2_rpc.infrastructure.catalog import BundledLocationCatalog
@@ -36,8 +38,6 @@ def test_locations_url_override_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
 
         def raise_for_status(self) -> None:
             pass
-
-    import httpx
 
     monkeypatch.setattr(httpx, "get", lambda url, **kw: _FakeResponse())
     settings = AppSettings(locations_url="http://example.com/locations.json")

@@ -1,6 +1,7 @@
 """Tests for domain port Protocols — all must be @runtime_checkable."""
+
+from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
-from typing import Awaitable, Callable, Iterator
 
 from poe2_rpc.domain.events import DomainEvent
 from poe2_rpc.domain.locations import Location
@@ -40,7 +41,11 @@ class _ConcretePresencePublisher:
     async def connect(self) -> None:
         pass
 
-    async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None:
+    async def publish(
+        self,
+        level_info: LevelInfo | None,
+        instance_info: InstanceInfo | None,
+    ) -> None:
         pass
 
     def close(self) -> None:

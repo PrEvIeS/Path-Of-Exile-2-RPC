@@ -1,4 +1,5 @@
 """Psutil-based game process detector."""
+
 from __future__ import annotations
 
 import time

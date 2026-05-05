@@ -1,15 +1,17 @@
 """Tests for configure_logging — RED phase."""
+
 from __future__ import annotations
 
 import sys
-from io import StringIO
 
 import pytest
 import structlog
 
+from poe2_rpc.infrastructure.logging import configure_logging
+from poe2_rpc.infrastructure.settings import AppSettings
+
 
 def _make_settings(log_format: str = "console", log_level: str = "INFO") -> object:
-    from poe2_rpc.infrastructure.settings import AppSettings
     return AppSettings(log_format=log_format, log_level=log_level)  # type: ignore[arg-type]
 
 
@@ -17,7 +19,6 @@ def test_configure_logging_console_when_tty(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(sys.stdout, "isatty", lambda: True)
     settings = _make_settings(log_format="console")
 
-    from poe2_rpc.infrastructure.logging import configure_logging
     configure_logging(settings)  # type: ignore[arg-type]
 
     cfg = structlog.get_config()
@@ -29,7 +30,6 @@ def test_configure_logging_json_when_setting(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
     settings = _make_settings(log_format="json")
 
-    from poe2_rpc.infrastructure.logging import configure_logging
     configure_logging(settings)  # type: ignore[arg-type]
 
     cfg = structlog.get_config()
@@ -40,7 +40,6 @@ def test_configure_logging_json_when_setting(monkeypatch: pytest.MonkeyPatch) ->
 def test_bind_contextvars_propagates(capsys: pytest.CaptureFixture[str]) -> None:
     settings = _make_settings(log_format="console", log_level="DEBUG")
 
-    from poe2_rpc.infrastructure.logging import configure_logging
     configure_logging(settings)  # type: ignore[arg-type]
 
     structlog.contextvars.clear_contextvars()
@@ -56,7 +55,6 @@ def test_bind_contextvars_propagates(capsys: pytest.CaptureFixture[str]) -> None
 def test_log_level_respected(capsys: pytest.CaptureFixture[str]) -> None:
     settings = _make_settings(log_format="console", log_level="WARNING")
 
-    from poe2_rpc.infrastructure.logging import configure_logging
     configure_logging(settings)  # type: ignore[arg-type]
 
     structlog.contextvars.clear_contextvars()

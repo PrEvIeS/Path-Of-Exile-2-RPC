@@ -1,4 +1,5 @@
 """Tests for application handlers — on_level_changed + on_area_entered (AC#7)."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -7,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import structlog.testing
 
+from poe2_rpc.application.handlers import on_area_entered, on_level_changed
 from poe2_rpc.domain.events import AreaEntered, CharacterLevelChanged
 from poe2_rpc.domain.models import InstanceInfo, LevelInfo
 
@@ -60,8 +62,6 @@ def _make_state(
 
 @pytest.mark.asyncio
 async def test_on_level_changed_formats_details_with_ascendancy() -> None:
-    from poe2_rpc.application.handlers import on_level_changed
-
     publisher = AsyncMock()
     throttle = _make_throttle(allow=True)
     li = _level_info(username="TestUser", base_class="Witch", ascension_class="Lich", level=42)
@@ -80,8 +80,6 @@ async def test_on_level_changed_formats_details_with_ascendancy() -> None:
 
 @pytest.mark.asyncio
 async def test_on_level_changed_omits_ascendancy_pipe_when_none() -> None:
-    from poe2_rpc.application.handlers import on_level_changed
-
     publisher = AsyncMock()
     throttle = _make_throttle(allow=True)
     li = _level_info(username="TestUser", base_class="Mercenary", ascension_class=None, level=42)
@@ -98,8 +96,6 @@ async def test_on_level_changed_omits_ascendancy_pipe_when_none() -> None:
 
 @pytest.mark.asyncio
 async def test_on_area_entered_formats_in_state() -> None:
-    from poe2_rpc.application.handlers import on_area_entered
-
     publisher = AsyncMock()
     throttle = _make_throttle(allow=True)
     ii = _instance_info(area_display_name="Clearfell", level=5)
@@ -116,9 +112,7 @@ async def test_on_area_entered_formats_in_state() -> None:
 
 @pytest.mark.asyncio
 async def test_small_image_lowercases_and_underscores() -> None:
-    """Infra derives small_image from ascension_class; handler passes LevelInfo with correct value."""
-    from poe2_rpc.application.handlers import on_level_changed
-
+    """Infra derives small_image from ascension_class; handler passes LevelInfo correctly."""
     publisher = AsyncMock()
     throttle = _make_throttle(allow=True)
     li = _level_info(ascension_class="Smith of Kitava", base_class="Warrior", level=10)
@@ -134,8 +128,6 @@ async def test_small_image_lowercases_and_underscores() -> None:
 
 @pytest.mark.asyncio
 async def test_handlers_bind_username_class_area_into_logs() -> None:
-    from poe2_rpc.application.handlers import on_level_changed
-
     publisher = AsyncMock()
     throttle = _make_throttle(allow=True)
     li = _level_info(username="LogUser", base_class="Ranger", ascension_class="Deadeye", level=20)
@@ -155,8 +147,6 @@ async def test_handlers_bind_username_class_area_into_logs() -> None:
 
 @pytest.mark.asyncio
 async def test_throttled_update_skips_publish() -> None:
-    from poe2_rpc.application.handlers import on_level_changed
-
     publisher = AsyncMock()
     throttle = _make_throttle(allow=False)
     li = _level_info()

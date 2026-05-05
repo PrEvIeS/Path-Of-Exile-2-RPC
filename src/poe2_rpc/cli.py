@@ -10,11 +10,12 @@ Commands:
                     Pass --no-discord to skip Discord IPC contact.
     --version       Print version and exit.
 """
+
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import structlog
 import typer

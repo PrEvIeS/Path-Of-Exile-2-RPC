@@ -7,16 +7,22 @@ TOML file location (Behavior Change #5 from ADR):
   Windows : %APPDATA%\\poe2-rpc\\config.toml
   POSIX   : ~/.config/poe2-rpc/config.toml
 """
+
 from __future__ import annotations
 
 import os
 import sys
+import tomllib
 from pathlib import Path
-from typing import Any, ClassVar, Literal
+from typing import Any, Literal
 
 from pydantic import PrivateAttr
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
-from pydantic_settings import TomlConfigSettingsSource
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    SettingsConfigDict,
+    TomlConfigSettingsSource,
+)
 
 
 def _default_config_path() -> Path:
@@ -56,8 +62,6 @@ class AppSettings(BaseSettings):
     def _apply_toml(self, path: Path) -> None:
         if not path.exists():
             return
-        import tomllib
-
         with open(path, "rb") as f:
             data = tomllib.load(f)
         for key, value in data.items():
@@ -73,6 +77,8 @@ class AppSettings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
+        # framework signature requires these but we don't consume them
+        del dotenv_settings, file_secret_settings
         toml_source = TomlConfigSettingsSource(settings_cls, toml_file=_default_config_path())
         # init → env → default TOML file → defaults
         return (init_settings, env_settings, toml_source)

@@ -9,8 +9,7 @@ import pytest
 def sample_log_line_level() -> str:
     """Sample Client.txt line that matches regex_level (verbatim contract)."""
     return (
-        "2024/01/01 12:00:00 12345 cffb0734 [INFO Client 9876] "
-        ": Foo (Witchhunter) is now level 42"
+        "2024/01/01 12:00:00 12345 cffb0734 [INFO Client 9876] : Foo (Witchhunter) is now level 42"
     )
 
 

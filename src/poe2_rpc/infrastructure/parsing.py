@@ -1,4 +1,5 @@
 """Regex-based log line parsers — byte-patterns preserved verbatim from main.py:273-274."""
+
 from __future__ import annotations
 
 import re

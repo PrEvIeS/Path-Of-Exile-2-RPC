@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import List, Optional
 
 
 class CharacterClass(Enum):
@@ -11,7 +10,7 @@ class CharacterClass(Enum):
     WITCH = "Witch"
     HUNTRESS = "Huntress"
 
-    def get_ascendencies(self) -> Optional[List["ClassAscendency"]]:
+    def get_ascendencies(self) -> list["ClassAscendency"] | None:
         return {
             CharacterClass.MERCENARY: [
                 ClassAscendency.WITCHHUNTER,

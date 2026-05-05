@@ -1,8 +1,10 @@
 """Domain port Protocols — all runtime_checkable, stdlib + domain imports only."""
+
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable, Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING, Awaitable, Callable, Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from poe2_rpc.domain.events import DomainEvent
 from poe2_rpc.domain.locations import Location
@@ -32,14 +34,22 @@ class LogParser(Protocol):
 @runtime_checkable
 class PresencePublisher(Protocol):
     async def connect(self) -> None: ...
-    async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None: ...
+    async def publish(
+        self,
+        level_info: LevelInfo | None,
+        instance_info: InstanceInfo | None,
+    ) -> None: ...
     def close(self) -> None: ...
 
 
 @runtime_checkable
 class EventBus(Protocol):
     def emit(self, event: DomainEvent) -> None: ...
-    def subscribe(self, event_type: type[DomainEvent], handler: Callable[[DomainEvent], Awaitable[None]]) -> None: ...
+    def subscribe(
+        self,
+        event_type: type[DomainEvent],
+        handler: Callable[[DomainEvent], Awaitable[None]],
+    ) -> None: ...
 
 
 @runtime_checkable

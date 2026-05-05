@@ -1,4 +1,5 @@
 """Frozen pydantic v2 domain event hierarchy."""
+
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict

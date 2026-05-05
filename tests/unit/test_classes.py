@@ -1,5 +1,4 @@
 """Tests for domain/classes.py — CharacterClass and ClassAscendency enums."""
-import pytest
 
 from poe2_rpc.domain.classes import CharacterClass, ClassAscendency
 
@@ -8,8 +7,13 @@ class TestCharacterClass:
     def test_all_base_classes_present(self) -> None:
         names = {m.name for m in CharacterClass}
         assert names == {
-            "MERCENARY", "MONK", "RANGER", "SORCERESS",
-            "WARRIOR", "WITCH", "HUNTRESS",
+            "MERCENARY",
+            "MONK",
+            "RANGER",
+            "SORCERESS",
+            "WARRIOR",
+            "WITCH",
+            "HUNTRESS",
         }
 
     def test_enum_values_match_ingame_strings(self) -> None:
@@ -34,11 +38,23 @@ class TestClassAscendency:
     def test_all_ascendencies_present(self) -> None:
         names = {m.name for m in ClassAscendency}
         assert names == {
-            "WITCHHUNTER", "GEMLING_LEGIONNAIRE", "ACOLYTE_OF_CHAYULA",
-            "INVOKER", "DEADEYE", "PATHFINDER", "CHRONOMANCER",
-            "STORMWEAVER", "TITAN", "WARBRINGER", "BLOOD_MAGE",
-            "INFERNALIST", "RITUALIST", "AMAZON", "SMITH_OF_KITAVA",
-            "LICH", "TACTICIAN",
+            "WITCHHUNTER",
+            "GEMLING_LEGIONNAIRE",
+            "ACOLYTE_OF_CHAYULA",
+            "INVOKER",
+            "DEADEYE",
+            "PATHFINDER",
+            "CHRONOMANCER",
+            "STORMWEAVER",
+            "TITAN",
+            "WARBRINGER",
+            "BLOOD_MAGE",
+            "INFERNALIST",
+            "RITUALIST",
+            "AMAZON",
+            "SMITH_OF_KITAVA",
+            "LICH",
+            "TACTICIAN",
         }
 
     def test_enum_values_match_ingame_strings(self) -> None:

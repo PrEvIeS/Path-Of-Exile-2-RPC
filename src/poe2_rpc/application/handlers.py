@@ -1,4 +1,5 @@
 """Application-layer event handlers — pure application code, no infrastructure imports."""
+
 from __future__ import annotations
 
 import structlog

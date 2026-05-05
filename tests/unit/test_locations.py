@@ -1,8 +1,9 @@
 """Tests for Location VO and LocationCatalog.resolve()."""
+
 import pytest
 from pydantic import ValidationError
 
-from poe2_rpc.domain.locations import Location, LocationCatalog
+from poe2_rpc.domain.locations import LocationCatalog
 
 
 @pytest.fixture

@@ -22,8 +22,10 @@ jobs:
     outputs:
       build_relevant: ${{ steps.filter.outputs.build_relevant }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         id: filter
         with:
           filters: |
@@ -39,10 +41,10 @@ jobs:
     needs: changes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -78,12 +80,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -140,25 +142,14 @@ jobs:
           name: executable
           path: dist
 
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create Release and upload asset
+        uses: softprops/action-gh-release@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ needs.build.outputs.tag_name }}
-          release_name: Release ${{ needs.build.outputs.tag_name }}
+          name: Release ${{ needs.build.outputs.tag_name }}
           body: ${{ needs.build.outputs.release_body }}
           draft: false
           prerelease: false
-
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: dist/PathOfExile2DiscordRPC.exe
-          asset_name: PathOfExile2DiscordRPC.exe
-          asset_content_type: application/octet-stream
+          files: dist/PathOfExile2DiscordRPC.exe

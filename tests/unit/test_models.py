@@ -1,4 +1,5 @@
 """Tests for domain value objects: LevelInfo and InstanceInfo."""
+
 import pytest
 from pydantic import ValidationError
 

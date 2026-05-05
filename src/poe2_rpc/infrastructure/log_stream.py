@@ -4,20 +4,22 @@ The watchdog observer runs on its own thread. It MUST NOT touch the asyncio Queu
 directly. All enqueues are scheduled via loop.call_soon_threadsafe so they execute
 on the event-loop thread, keeping the Queue single-threaded.
 """
+
 from __future__ import annotations
 
 import asyncio
 import re
 import time
 from asyncio import AbstractEventLoop, QueueFull
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING, AsyncIterator
+from typing import TYPE_CHECKING
 
 import structlog
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 
-from poe2_rpc.domain.exceptions import LogStreamStalled
+from poe2_rpc.domain.exceptions import LogStreamStalledError
 
 if TYPE_CHECKING:
     from poe2_rpc.infrastructure.settings import AppSettings
@@ -40,11 +42,11 @@ def _classify_line(line: str) -> bool:
 class _LogFileHandler(FileSystemEventHandler):
     """Watchdog handler — runs on the observer thread."""
 
-    def __init__(self, stream: "WatchdogLogStream") -> None:
+    def __init__(self, stream: WatchdogLogStream) -> None:
         super().__init__()
         self._stream = stream
 
-    def on_modified(self, event: FileSystemEvent) -> None:
+    def on_modified(self, _event: FileSystemEvent) -> None:
         self._stream._read_new_lines()
 
 
@@ -54,15 +56,13 @@ class WatchdogLogStream:
     def __init__(
         self,
         log_path: Path,
-        settings: "AppSettings",
+        settings: AppSettings,
         loop: AbstractEventLoop,
     ) -> None:
         self._log_path = log_path
         self._settings = settings
         self._loop = loop
-        self._queue: asyncio.Queue[str] = asyncio.Queue(
-            maxsize=settings.log_stream_queue_maxsize
-        )
+        self._queue: asyncio.Queue[str] = asyncio.Queue(maxsize=settings.log_stream_queue_maxsize)
         self._cursor: int = 0
         self._observer = Observer()
         self._handler = _LogFileHandler(self)
@@ -125,7 +125,7 @@ class WatchdogLogStream:
                 started_at = _started_at if _started_at is not None else time.monotonic()
                 deadline = self._settings.log_stream_enqueue_deadline_seconds
                 if time.monotonic() - started_at >= deadline:
-                    raise LogStreamStalled(
+                    raise LogStreamStalledError(
                         f"Domain line could not be enqueued within {deadline}s"
                     ) from None
                 next_delay = min(_delay * 2, _BACKOFF_CAP)

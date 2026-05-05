@@ -1,4 +1,5 @@
 """AST guard: domain modules must not have module-level mutable state."""
+
 import ast
 from pathlib import Path
 
@@ -14,6 +15,7 @@ ALLOWED_NODE_TYPES = (
     ast.Import,
     ast.If,  # allow if TYPE_CHECKING guards
 )
+
 
 def _is_final_annotation(annotation: ast.expr | None) -> bool:
     if annotation is None:
@@ -54,9 +56,7 @@ def collect_violations(path: Path) -> list[str]:
                 f"{path.name}:{node.lineno} — annotated assignment without Final[...]"
             )
         elif isinstance(node, ast.Assign):
-            violations.append(
-                f"{path.name}:{node.lineno} — bare module-level assignment"
-            )
+            violations.append(f"{path.name}:{node.lineno} — bare module-level assignment")
 
     return violations
 
@@ -72,6 +72,6 @@ def test_domain_modules_have_no_mutable_state() -> None:
     for path in sorted(domain_files):
         all_violations.extend(collect_violations(path))
 
-    assert not all_violations, (
-        "Module-level mutable state found in domain:\n" + "\n".join(all_violations)
+    assert not all_violations, "Module-level mutable state found in domain:\n" + "\n".join(
+        all_violations
     )

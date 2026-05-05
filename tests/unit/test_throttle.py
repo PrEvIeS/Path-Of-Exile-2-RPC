@@ -1,7 +1,8 @@
 """Tests for PresenceThrottle application service."""
+
 from __future__ import annotations
 
-from poe2_rpc.application.throttle import PresenceThrottle
+from poe2_rpc.application.throttle import PresenceThrottle, random_status
 
 
 def test_first_call_is_not_throttled() -> None:
@@ -39,8 +40,6 @@ def test_call_after_interval_is_not_throttled() -> None:
 
 
 def test_random_status_returns_known_string() -> None:
-    from poe2_rpc.application.throttle import random_status
-
     result = random_status()
     known = [
         "Exploring ancient ruins",

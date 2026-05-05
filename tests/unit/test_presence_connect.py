@@ -1,9 +1,11 @@
 """Unit tests for PypresencePublisher.connect (C-7a)."""
+
 from __future__ import annotations
 
-import pytest
 import pypresence.exceptions as pex
+import pytest
 
+from poe2_rpc.infrastructure.presence import PypresencePublisher
 from poe2_rpc.infrastructure.settings import AppSettings
 
 
@@ -39,8 +41,6 @@ def settings() -> AppSettings:
 
 @pytest.mark.asyncio
 async def test_connect_calls_aiopresence_connect_once_on_success(settings: AppSettings) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     fake = FakeAioPresence("test-app-id")
     publisher = PypresencePublisher(settings, presence_factory=lambda cid: fake)  # type: ignore[arg-type]
     await publisher.connect()
@@ -50,16 +50,14 @@ async def test_connect_calls_aiopresence_connect_once_on_success(settings: AppSe
 
 
 @pytest.mark.asyncio
-async def test_connect_retries_5_times_on_pipeclosed(
-    settings: AppSettings, mocker: object
-) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
+async def test_connect_retries_5_times_on_pipeclosed(settings: AppSettings, mocker: object) -> None:
     mocker.patch("asyncio.sleep")  # type: ignore[union-attr]
 
     fake = FakeAioPresence("test-app-id")
     # Fail 4 times, succeed on 5th
-    fake.set_side_effects([pex.PipeClosed(), pex.PipeClosed(), pex.PipeClosed(), pex.PipeClosed(), None])
+    fake.set_side_effects(
+        [pex.PipeClosed(), pex.PipeClosed(), pex.PipeClosed(), pex.PipeClosed(), None]
+    )
 
     publisher = PypresencePublisher(settings, presence_factory=lambda cid: fake)  # type: ignore[arg-type]
     await publisher.connect()
@@ -71,8 +69,6 @@ async def test_connect_retries_5_times_on_pipeclosed(
 async def test_connect_reraises_after_all_attempts_exhausted(
     settings: AppSettings, mocker: object
 ) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     mocker.patch("asyncio.sleep")  # type: ignore[union-attr]
 
     fake = FakeAioPresence("test-app-id")
@@ -88,8 +84,6 @@ async def test_connect_reraises_after_all_attempts_exhausted(
 
 @pytest.mark.asyncio
 async def test_connect_uses_settings_app_id(mocker: object) -> None:
-    from poe2_rpc.infrastructure.presence import PypresencePublisher
-
     custom_settings = AppSettings(discord_app_id="custom-id-123", connect_retry_attempts=5)
     captured: list[str] = []
 

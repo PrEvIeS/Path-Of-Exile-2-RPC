@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import poe2_rpc
+import poe2_rpc.application
+import poe2_rpc.domain
+import poe2_rpc.infrastructure
 
 
 def test_package_importable() -> None:
@@ -12,10 +15,6 @@ def test_package_importable() -> None:
 
 
 def test_subpackages_importable() -> None:
-    import poe2_rpc.application
-    import poe2_rpc.domain
-    import poe2_rpc.infrastructure
-
     assert poe2_rpc.domain.__doc__ is not None
     assert poe2_rpc.application.__doc__ is not None
     assert poe2_rpc.infrastructure.__doc__ is not None

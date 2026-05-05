@@ -1,4 +1,5 @@
 """Bundled locations.json catalog adapter implementing LocationCatalogPort."""
+
 from __future__ import annotations
 
 import importlib.resources
@@ -17,9 +18,7 @@ def load_bundled_catalog() -> LocationCatalog:
     bundled JSON is present and parsable without contacting Discord.
     """
     text = (
-        importlib.resources.files("poe2_rpc")
-        .joinpath("locations.json")
-        .read_text(encoding="utf-8")
+        importlib.resources.files("poe2_rpc").joinpath("locations.json").read_text(encoding="utf-8")
     )
     data = json.loads(text)
     return LocationCatalog(areas=dict(data.get("areas", {})))

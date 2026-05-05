@@ -1,7 +1,6 @@
 """Unit tests for infrastructure parsing functions."""
-from __future__ import annotations
 
-import pytest
+from __future__ import annotations
 
 from poe2_rpc.infrastructure.parsing import parse_instance_event, parse_level_event
 

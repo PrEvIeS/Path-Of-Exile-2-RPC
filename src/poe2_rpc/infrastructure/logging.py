@@ -3,6 +3,7 @@
 Call configure_logging(settings) once at startup. Do NOT call
 stdlib logging.basicConfig — structlog is the canonical interface.
 """
+
 from __future__ import annotations
 
 import logging

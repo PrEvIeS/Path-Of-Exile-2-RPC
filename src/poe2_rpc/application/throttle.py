@@ -1,9 +1,10 @@
 """Presence update throttle and random status strings."""
+
 from __future__ import annotations
 
 import random
 import time
-from typing import Callable
+from collections.abc import Callable
 
 
 def random_status() -> str:

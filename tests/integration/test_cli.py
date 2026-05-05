@@ -1,4 +1,5 @@
 """Integration tests for the Typer CLI / composition root."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

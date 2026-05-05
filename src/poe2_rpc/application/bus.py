@@ -1,9 +1,10 @@
 """Application-layer event bus — pure asyncio, no infrastructure imports."""
+
 from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
-from typing import Awaitable, Callable
+from collections.abc import Awaitable, Callable
 
 import structlog
 

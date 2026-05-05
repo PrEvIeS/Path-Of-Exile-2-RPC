@@ -1,9 +1,10 @@
 """Discord Rich Presence publisher — infrastructure adapter for PresencePublisher port."""
+
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import pypresence.exceptions as pex
@@ -91,7 +92,7 @@ class PypresencePublisher:
         instance_info: InstanceInfo | None,
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
-            "start": int(datetime.now(tz=timezone.utc).timestamp()),
+            "start": int(datetime.now(tz=UTC).timestamp()),
         }
         if level_info is not None:
             details = f"{level_info.username} ({level_info.base_class}"
@@ -102,9 +103,7 @@ class PypresencePublisher:
             asc = level_info.ascension_class or level_info.base_class
             kwargs["small_image"] = asc.lower().replace(" ", "_")
         if instance_info is not None:
-            kwargs["state"] = (
-                f"In: {instance_info.area_display_name} (Lvl {instance_info.level})"
-            )
+            kwargs["state"] = f"In: {instance_info.area_display_name} (Lvl {instance_info.level})"
         return kwargs
 
     def close(self) -> None:

@@ -1,4 +1,5 @@
 """AST guard: domain modules must not import from application, infrastructure, or cli layers."""
+
 import ast
 from pathlib import Path
 
@@ -48,6 +49,6 @@ def test_domain_modules_do_not_import_outer_layers() -> None:
     for path in sorted(domain_files):
         all_violations.extend(collect_forbidden_imports(path))
 
-    assert not all_violations, (
-        "Domain modules import from outer layers:\n" + "\n".join(all_violations)
+    assert not all_violations, "Domain modules import from outer layers:\n" + "\n".join(
+        all_violations
     )

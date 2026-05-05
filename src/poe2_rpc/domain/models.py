@@ -1,4 +1,5 @@
 """Frozen pydantic v2 value objects for the domain layer."""
+
 from pydantic import BaseModel, ConfigDict
 
 
