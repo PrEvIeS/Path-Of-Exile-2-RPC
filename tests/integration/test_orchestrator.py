@@ -1,9 +1,10 @@
 """Integration test: Orchestrator full-flow with fake factory."""
+
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 from poe2_rpc.application.bus import AsyncioEventBus
 from poe2_rpc.application.handlers import MutableState
@@ -13,8 +14,8 @@ from poe2_rpc.domain.locations import Location
 from poe2_rpc.domain.models import InstanceInfo, LevelInfo
 from poe2_rpc.domain.ports import LogStream
 
-
 # --- Fakes ---
+
 
 class FakeSettings:
     throttle_window_seconds: float = 0.0
@@ -73,7 +74,11 @@ class FakePresencePublisher:
     async def connect(self) -> None:
         self.connected = True
 
-    async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None:
+    async def publish(
+        self,
+        level_info: LevelInfo | None,
+        instance_info: InstanceInfo | None,
+    ) -> None:
         self.published.append((level_info, instance_info))
 
     def close(self) -> None:
@@ -115,6 +120,7 @@ def _make_orchestrator(
 
 # --- Tests ---
 
+
 def test_orchestrator_emits_level_event_and_publishes() -> None:
     """Orchestrator wires bus/handlers: a LEVEL log line triggers presence publish."""
     orch, publisher = _make_orchestrator(stream_lines=["LEVEL:Hero,Warrior,10"])
@@ -136,6 +142,39 @@ def test_orchestrator_emits_area_event_and_publishes() -> None:
     _, instance_info = publisher.published[0]
     assert instance_info is not None
     assert instance_info.area_code == "G1_1"
+
+
+def test_orchestrator_resolves_area_display_name_via_catalog() -> None:
+    """panvex-00o: orchestrator must call catalog.resolve() so handlers see resolved names."""
+
+    class ResolvingCatalog:
+        def resolve(self, area_code: str) -> Location:
+            return Location(area_code=area_code, display_name="The Riverbank")
+
+    pub = FakePresencePublisher()
+    log_path = Path("/fake/Client.txt")
+
+    def factory(path: Path, loop: asyncio.AbstractEventLoop) -> LogStream:
+        return FakeLogStream(["AREA:G1_1,raw_internal_code,5"])
+
+    orch = Orchestrator(
+        detector=FakeGameDetector(log_path),
+        parser=FakeLogParser(),
+        publisher=pub,
+        catalog=ResolvingCatalog(),
+        bus=AsyncioEventBus(),
+        log_stream_factory=factory,
+        throttle=PresenceThrottle(interval=0.0),
+        current_state=MutableState(),
+        settings=FakeSettings(),
+    )
+    orch.run_once()
+
+    assert len(pub.published) == 1
+    _, instance_info = pub.published[0]
+    assert instance_info is not None
+    assert instance_info.area_code == "G1_1"
+    assert instance_info.area_display_name == "The Riverbank"
 
 
 def test_orchestrator_factory_called_with_log_path() -> None:

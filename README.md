@@ -3,10 +3,18 @@
 
 
 ## ⚙️ Install guide:
-1. Install Python 3.8 or higher.
-2. Install the required libraries using pip: `pip install -r requirements.txt`
-3. Run the script: `python main.py`
+1. Install Python 3.11 or higher.
+2. Install the package and dev dependencies: `pip install -e ".[dev]"`
+3. Run the app: `poe2-rpc run` (or `python -m poe2_rpc run`).
 4. Ensure that Discord is running.
+
+Optional config: drop a `config.toml` at `%APPDATA%\poe2-rpc\config.toml` on
+Windows (or `~/.config/poe2-rpc/config.toml` on macOS/Linux for dev). Defaults
+work without one.
+
+CLI commands: `poe2-rpc run` (continuous monitor), `poe2-rpc once` (single
+log-stream pass), `poe2-rpc validate-config --no-discord` (validate settings
++ bundled assets without contacting Discord IPC).
 
 **For convenience, a pre-compiled .exe is available in the releases section.  
 Download the latest release here:**  

@@ -4,69 +4,100 @@ Project-level guidance for Claude Code working in this repository. Pair with the
 
 ## Project at a glance
 - **What it is:** A Discord Rich Presence integration for Path of Exile 2. Tails the game's `Client.txt`, parses level-up and area-generation events, and pushes presence updates via `pypresence`.
-- **Shape:** Single-script Python app. The runtime entrypoint is `main.py`; everything else (`locations.json`, `requirements.txt`, GitHub config) supports it.
-- **Distribution:** End users grab a prebuilt Windows `.exe` from GitHub Releases. The `.exe` is produced by `.github/workflows/build.yml` via PyInstaller `--onefile` whenever `main.py` changes on `main`.
+- **Shape:** Hexagonal Python package at `src/poe2_rpc/` with `domain/`, `application/`, `infrastructure/`, and `cli.py` (composition root). The Typer app in `cli.py` is the runtime entrypoint; `pyproject.toml` exposes it as the `poe2-rpc` console script and `python -m poe2_rpc`.
+- **Distribution:** End users grab a prebuilt Windows `.exe` from GitHub Releases. The `.exe` is produced by `.github/workflows/build.yml` via PyInstaller `--onefile` against `PathOfExile2DiscordRPC.spec`. CI re-runs whenever `src/**`, `pyproject.toml`, `locations.json`, the spec file, or the workflow itself changes.
 
 ## Build & Test
 
 ```bash
-pip install -r requirements.txt
-python main.py
+pip install -e ".[dev]"
+poe2-rpc run                            # continuous monitor loop
+poe2-rpc once                           # single log-stream pass
+poe2-rpc validate-config --no-discord   # smoke check (no Discord IPC)
 ```
 
-Discord must be running. The script polls `psutil` for `PathOfExileSteam.exe` and only proceeds once the game is running — it will block on `Waiting for the game start..` otherwise.
+Discord must be running for `run` / `once`. `infrastructure/detection.py::PsutilGameDetector` blocks until `PathOfExileSteam.exe` is detected (`log_path()` polls every 5s).
 
-There is no automated test suite. Verification is manual: run the game, run the script, watch Discord for the expected presence, then kill/relaunch Discord to exercise `rpc_connect`'s 5-retry exponential-backoff loop.
+The full gate suite (mirrors CI):
+
+```bash
+pytest tests -ra
+mypy --strict src/poe2_rpc
+lint-imports               # enforces hexagonal layering
+ruff check src tests
+ruff format --check src tests
+```
+
+Optional config: `%APPDATA%\poe2-rpc\config.toml` on Windows, `~/.config/poe2-rpc/config.toml` on macOS/Linux for cross-platform dev. Defaults work without one — see `infrastructure/settings.py::AppSettings` for the schema.
 
 ## Architecture Overview
 
-`main.py` is the whole app. Top to bottom:
+Hexagonal layering is enforced by `import-linter` (see `[tool.importlinter]` in `pyproject.toml`):
 
-1. **Enums** (`CharacterClass`, `ClassAscendency`) — mappings between in-game class strings and ascendancies. The enum value is what appears in the log.
-2. **`find_game_log()`** — `psutil.process_iter` loop hunting for `PathOfExileSteam.exe`; returns `<game_dir>/logs/Client.txt`.
-3. **`load_locations()`** — reads `locations.json` from disk if present, otherwise downloads it from this repo's `main` branch and caches it.
-4. **`determine_location()`** — turns an internal area code (e.g. `G1_4_BrambleghastSlain`) into a display name; map areas (`Map*`) get prefix-stripped and underscore-split before lookup.
-5. **Parsers** — `find_last_level_up()` and `find_instance()` apply two precompiled regexes to log lines.
-6. **`rpc_connect()`** — 5-attempt connect loop with `time.sleep(2 ** retries)` backoff against the Discord IPC socket (app ID `1315800372207419504`).
-7. **`update_rpc()`** — formats presence details and sets `small_image = ascension_class.lower().replace(" ", "_")`.
-8. **`monitor_log()`** — opens the log, seeks to EOF, then loops `readlines()` + `time.sleep(5)`, dispatching to `update_rpc()` whenever the parsed level or zone changes.
+```
+poe2_rpc.cli           ← composition root; only layer that imports infrastructure
+poe2_rpc.application   ← orchestration, event bus, throttle, handlers — Protocols only
+poe2_rpc.infrastructure ← psutil/watchdog/pypresence/pydantic-settings/structlog adapters
+poe2_rpc.domain        ← pure value objects, events, ports — no I/O, no third-party
+```
+
+Key modules:
+
+- `domain/models.py` — frozen pydantic VOs (`LevelInfo`, `InstanceInfo`).
+- `domain/events.py` — `CharacterLevelChanged`, `AreaEntered`, etc.
+- `domain/ports.py` — runtime-checkable Protocols (`GameDetector`, `LogStream`, `LogParser`, `PresencePublisher`, `EventBus`, `LocationCatalogPort`, `Settings`).
+- `domain/locations.py` — `LocationCatalog.resolve(area_code)` returns a `Location` VO.
+- `domain/classes.py` — `CharacterClass` / `ClassAscendency` enums (matches in-game strings verbatim).
+- `application/orchestrator.py` — composes bus + throttle + handlers; calls `catalog.resolve()` between parse and emit so handlers see resolved display names.
+- `application/handlers.py` — `on_level_changed` / `on_area_entered`; structlog `bind_contextvars` carries `username` / `character_class` / `area`.
+- `application/throttle.py` — `PresenceThrottle` (Discord IPC rate-limit guard).
+- `infrastructure/parsing.py` — `regex_level` / `regex_instance` (verbatim from `main.py:273-274`) + `RegexLogParser` adapter.
+- `infrastructure/detection.py` — `PsutilGameDetector` (`is_running()` / blocking `log_path()`).
+- `infrastructure/log_stream.py` — `WatchdogLogStream` (event-driven via `ReadDirectoryChangesW`; thread-safe enqueue via `loop.call_soon_threadsafe`).
+- `infrastructure/presence.py` — `PypresencePublisher` (`AioPresence` + tenacity split-retry: connect 5×wait_exponential(2,32), publish 3×wait_exponential(1,8)).
+- `infrastructure/catalog.py` — `load_bundled_catalog()` reads bundled `locations.json` via `importlib.resources`.
+- `infrastructure/settings.py` — `AppSettings` (pydantic-settings BaseSettings).
+- `infrastructure/logging.py` — structlog config (ConsoleRenderer dev / JSONRenderer prod).
+- `cli.py` — Typer app (`run`, `once`, `validate-config`, `--version`); `build_orchestrator(settings)` factory + `_SyncLineIterator` adapter bridging async `WatchdogLogStream` to the sync `LogStream` Protocol.
 
 ## Conventions & Patterns
 
-- **Keep it one file.** CI's path-filter (`paths: ['main.py']`) and the PyInstaller call assume a single entrypoint. Splitting modules requires updating both in the same change.
-- **Type hints + `logging`.** 4-space indent, type hints on signatures, `logging.info/error/warning` instead of `print`.
-- **`pathlib.Path` + explicit `encoding="utf-8"`** for all file I/O.
-- **Optional return shape:** parsers return `Optional[Dict[str, str]]`; the caller does the `if level_info:` check.
-- **Exponential backoff** for retry loops (`time.sleep(2 ** retries)`), matching `rpc_connect`.
+- **Hexagonal layering is non-negotiable.** Don't import infrastructure from application or domain — `lint-imports` will fail. The composition root in `cli.py` is the *only* place where adapters and application code meet.
+- **Frozen pydantic v2 VOs everywhere in `domain/`.** No mutable state, no `dataclass`. `tests/unit/test_no_mutable_state.py` AST guard enforces this.
+- **`mypy --strict`** is mandatory. 4-space indent, type hints on every signature.
+- **`structlog` not `logging`.** Use `bind_contextvars(username=, character_class=, area=)` so events carry context through the call graph (AC#7).
+- **`pathlib.Path` + explicit `encoding="utf-8"`** for file I/O. Bundled JSON via `importlib.resources.files("poe2_rpc")` — never `Path("locations.json")` cwd-relative.
+- **Tenacity for retries**, not hand-rolled `time.sleep(2 ** retries)`. Split policies for connect vs publish (see `infrastructure/presence.py`).
 
 ## Adding a new ascendancy
 
-1. Add the enum member to `ClassAscendency` — value must match the in-game string verbatim (e.g. `"Smith of Kitava"`).
+1. Add the enum member to `ClassAscendency` in `src/poe2_rpc/domain/classes.py` — value must match the in-game string verbatim (e.g. `"Smith of Kitava"`).
 2. Add the mapping in `ClassAscendency.get_class()`.
 3. Append it to the right list in `CharacterClass.get_ascendencies()`.
-4. Upload the matching Discord asset using the **lowercase + underscore** key, since `update_rpc` derives `small_image` as `ascension_class.lower().replace(" ", "_")` (commit `5ae14e6` enforced this).
+4. Upload the matching Discord asset using the **lowercase + underscore** key, since the formatter derives `small_image` as `ascension_class.lower().replace(" ", "_")` (commit `5ae14e6` enforced this).
 
 Reference commit: `fe9c494` ("Add new character classes: Smith of Kitava, Lich, and Tactician").
 
 ## Adding/updating zones
 
-- Edit `locations.json` (the in-repo copy is the source of truth) and ship it in the same commit.
+- Edit `src/poe2_rpc/locations.json` (bundled into the package via `[tool.setuptools.package-data]`); the root-level `locations.json` is kept in sync as the human-edit source of truth.
 - Schema: `{"areas": {"<internal_code>": "<display name>"}}`. Internal codes look like `G1_1`, `G1_4_Brambleghast`, etc.
-- `determine_location()` strips a leading `Map` prefix and splits on `_` for map-tier areas, so map-name lookups bypass `locations.json`.
-- Existing installs auto-fetch `locations.json` from GitHub `main` only when the local file is **missing**. The upgrade path for cached installs is a new `.exe` release.
+- `LocationCatalog.resolve()` strips a leading `Map` prefix and splits on `_` for map-tier areas, so map-name lookups don't require a dictionary entry.
+- The `.exe` reads the bundled JSON via `importlib.resources` — no runtime URL fetch. To override locally for testing, set `AppSettings.locations_url` (env var `POE2_RPC_LOCATIONS_URL`).
 
 ## Regex contracts
 
-Don't break these without checking a real `Client.txt` sample:
+Don't break these without checking a real `Client.txt` sample (G-1 enforces this via `tests/integration/test_regex_real_sample.py` once the fixture is captured):
 
 - `regex_level`: `r": (\w+) \(([\w\s]+)\) is now level (\d+)"` → `(username, base_or_ascendancy_class, level)`.
 - `regex_instance`: `r'Generating level (\d+) area "([^"]+)" with seed (\d+)'` → `(level, area_code, seed)`.
 
-Both target the Steam-build log format.
+Both target the Steam-build log format. Defined in `src/poe2_rpc/infrastructure/parsing.py`.
 
 ## CI / Release flow
 
-- Push to `main` touching `main.py` → `.github/workflows/build.yml` runs on `windows-latest`.
+- Push to `main` touching `src/**`, `pyproject.toml`, `locations.json`, `PathOfExile2DiscordRPC.spec`, or the workflow → `.github/workflows/build.yml` runs lint+test on `ubuntu-latest`, then build on `windows-latest`.
+- The build job runs `pyinstaller PathOfExile2DiscordRPC.spec`, then deep-smoke `dist\PathOfExile2DiscordRPC.exe validate-config --no-discord`, then the cold-start benchmark (continue-on-error: budget breach files a follow-up bd issue, doesn't block release).
 - A timestamp tag (`vYYYYMMDD-HHMMSS`) is created and pushed; the release job uploads `PathOfExile2DiscordRPC.exe` as a GitHub Release asset.
 
 ## Open work (from README)

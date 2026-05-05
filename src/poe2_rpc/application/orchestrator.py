@@ -3,12 +3,13 @@
 Principle 4: zero poe2_rpc.infrastructure.* imports. The log stream is created
 via an injected factory so the composition root (cli.py) owns the concrete type.
 """
+
 from __future__ import annotations
 
 import asyncio
 import functools
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import structlog
 
@@ -90,7 +91,11 @@ class Orchestrator:
                     continue
                 instance_info = self._parser.parse_instance(line)
                 if instance_info is not None:
-                    self._bus.emit(AreaEntered(instance_info=instance_info))
+                    location = self._catalog.resolve(instance_info.area_code)
+                    resolved = instance_info.model_copy(
+                        update={"area_display_name": location.display_name}
+                    )
+                    self._bus.emit(AreaEntered(instance_info=resolved))
         except (asyncio.CancelledError, KeyboardInterrupt):
             _log.info("orchestrator_shutdown")
         finally:
