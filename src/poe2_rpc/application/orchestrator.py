@@ -14,9 +14,20 @@ from pathlib import Path
 import structlog
 
 from poe2_rpc.application.bus import AsyncioEventBus
-from poe2_rpc.application.handlers import MutableState, on_area_entered, on_level_changed
+from poe2_rpc.application.handlers import (
+    MutableState,
+    on_area_entered,
+    on_level_changed,
+    on_local_area_entered,
+    on_party_joined,
+)
 from poe2_rpc.application.throttle import PresenceThrottle
-from poe2_rpc.domain.events import AreaEntered, CharacterLevelChanged
+from poe2_rpc.domain.events import (
+    AreaEntered,
+    CharacterLevelChanged,
+    LocalAreaEntered,
+    PartyMemberJoined,
+)
 from poe2_rpc.domain.ports import (
     GameDetector,
     LocationCatalogPort,
@@ -75,6 +86,14 @@ class Orchestrator:
                 current_state=self._current_state,
             ),
         )
+        self._bus.subscribe(
+            LocalAreaEntered,
+            functools.partial(on_local_area_entered, current_state=self._current_state),
+        )
+        self._bus.subscribe(
+            PartyMemberJoined,
+            functools.partial(on_party_joined, current_state=self._current_state),
+        )
 
     def run_once(self) -> None:
         """Process all lines from one log stream pass. Handles CancelledError/KeyboardInterrupt."""
@@ -85,6 +104,14 @@ class Orchestrator:
             log_path = self._detector.log_path()
             stream = self._factory(log_path, loop)
             for line in stream.lines():
+                local_area = self._parser.parse_local_area_entered(line)
+                if local_area is not None:
+                    self._bus.emit(LocalAreaEntered(area_name=local_area))
+                    continue
+                party_name = self._parser.parse_party_joined(line)
+                if party_name is not None:
+                    self._bus.emit(PartyMemberJoined(name=party_name))
+                    continue
                 level_info = self._parser.parse_level(line)
                 if level_info is not None:
                     self._bus.emit(CharacterLevelChanged(level_info=level_info))

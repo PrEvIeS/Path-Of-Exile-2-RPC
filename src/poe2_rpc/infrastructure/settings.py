@@ -50,6 +50,7 @@ class AppSettings(BaseSettings):
         "PathOfExile.exe",
     ]
     locations_url: str | None = None
+    character_name: str | None = None
     log_stream_enqueue_deadline_seconds: float = 2.0
     log_stream_queue_maxsize: int = 1000
     throttle_window_seconds: float = 15.0

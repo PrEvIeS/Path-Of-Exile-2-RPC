@@ -25,6 +25,7 @@ from poe2_rpc.application.bus import AsyncioEventBus
 from poe2_rpc.application.handlers import MutableState
 from poe2_rpc.application.orchestrator import Orchestrator
 from poe2_rpc.application.throttle import PresenceThrottle
+from poe2_rpc.domain.owner import OwnerTracker
 from poe2_rpc.domain.ports import LogStream
 from poe2_rpc.infrastructure.catalog import load_bundled_catalog
 from poe2_rpc.infrastructure.detection import PsutilGameDetector
@@ -93,7 +94,9 @@ def build_orchestrator(settings: AppSettings) -> Orchestrator:
         bus=bus,
         log_stream_factory=factory,
         throttle=PresenceThrottle(interval=settings.throttle_window_seconds),
-        current_state=MutableState(),
+        current_state=MutableState(
+            owner_tracker=OwnerTracker.unknown(override_name=settings.character_name),
+        ),
         settings=settings,
     )
 

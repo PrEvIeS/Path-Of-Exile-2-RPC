@@ -65,6 +65,16 @@ class FakeLogParser:
             )
         return None
 
+    def parse_local_area_entered(self, line: str) -> str | None:
+        if line.startswith("LOCAL_AREA:"):
+            return line[len("LOCAL_AREA:") :]
+        return None
+
+    def parse_party_joined(self, line: str) -> str | None:
+        if line.startswith("PARTY:"):
+            return line[len("PARTY:") :]
+        return None
+
 
 class FakePresencePublisher:
     def __init__(self) -> None:

@@ -25,3 +25,15 @@ class CharacterLevelChanged(DomainEvent):
 
 class AreaEntered(DomainEvent):
     instance_info: InstanceInfo
+
+
+class LocalAreaEntered(DomainEvent):
+    """Emitted on `: You have entered <area>.` — signals the local player crossed a boundary."""
+
+    area_name: str
+
+
+class PartyMemberJoined(DomainEvent):
+    """Emitted on `<name> has joined the area.` — signals another player is in the same instance."""
+
+    name: str

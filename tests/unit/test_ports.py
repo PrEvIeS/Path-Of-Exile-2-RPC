@@ -36,6 +36,12 @@ class _ConcreteLogParser:
     def parse_instance(self, line: str) -> InstanceInfo | None:
         return None
 
+    def parse_local_area_entered(self, line: str) -> str | None:
+        return None
+
+    def parse_party_joined(self, line: str) -> str | None:
+        return None
+
 
 class _ConcretePresencePublisher:
     async def connect(self) -> None:
