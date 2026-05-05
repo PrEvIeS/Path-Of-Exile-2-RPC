@@ -1,6 +1,6 @@
 <img width="800" height="500" alt="2" src="https://github.com/user-attachments/assets/30d06f66-797b-4c52-9895-344c42ecadff" />
 
-
+**Languages:** English · [Русский](README.ru.md) · [Українська](README.ua.md)
 
 ## ⚙️ Install guide:
 1. Install Python 3.11 or higher.
