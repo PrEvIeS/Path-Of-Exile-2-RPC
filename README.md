@@ -16,6 +16,27 @@ CLI commands: `poe2-rpc run` (continuous monitor), `poe2-rpc once` (single
 log-stream pass), `poe2-rpc validate-config --no-discord` (validate settings
 + bundled assets without contacting Discord IPC).
 
+### 🖥️ Run as a background service (Windows tray)
+
+Install the optional tray extras first, then launch the tray icon and
+register it with Windows Startup so it boots on login:
+
+```bash
+pip install "poe2-rpc[tray]"
+poe2-rpc tray              # foreground tray (Status / Open log / Restart / Quit)
+poe2-rpc install-autostart # Startup-folder shortcut so it launches on login
+poe2-rpc uninstall-autostart
+```
+
+Notes:
+
+- The tray runs the orchestrator on a background thread; `Quit` performs an
+  orderly shutdown of the log-stream watcher.
+- The shortcut points at the running interpreter / packaged `.exe` and passes
+  `tray --quiet` so no console window is spawned at login.
+- Use `poe2-rpc tray --quiet` from PowerShell if you launch it manually and
+  want to suppress the console.
+
 **For convenience, a pre-compiled .exe is available in the releases section.  
 Download the latest release here:**  
 👉 https://github.com/ezbooz/Path-Of-Exile-2-RPC/releases
@@ -31,7 +52,7 @@ Download the latest release here:**
 ## 🔧 To-Do
 
 - [x] Support for custom images (all classes and ascendancies)
-- [ ] Launch as background service when game starts
+- [x] Launch as background service when game starts (tray + Windows Startup shortcut)
 - [ ] Add support for the official PoE2 client
 - [ ] Detect the player who started the script (avoid party conflicts)
 - [ ] Show AFK status

@@ -67,6 +67,7 @@ class Orchestrator:
         self._throttle = throttle
         self._current_state = current_state
         self._settings = settings
+        self._current_stream: LogStream | None = None
         self._subscribe_handlers()
 
     def _subscribe_handlers(self) -> None:
@@ -113,30 +114,39 @@ class Orchestrator:
             loop.run_until_complete(self._publisher.connect())
             log_path = self._detector.log_path()
             stream = self._factory(log_path, loop)
-            for line in stream.lines():
-                local_area = self._parser.parse_local_area_entered(line)
-                if local_area is not None:
-                    self._bus.emit(LocalAreaEntered(area_name=local_area))
-                    continue
-                party_name = self._parser.parse_party_joined(line)
-                if party_name is not None:
-                    self._bus.emit(PartyMemberJoined(name=party_name))
-                    continue
-                afk_status = self._parser.parse_afk_event(line)
-                if afk_status is not None:
-                    self._bus.emit(AFKStatusChanged(status=afk_status))
-                    continue
-                level_info = self._parser.parse_level(line)
-                if level_info is not None:
-                    self._bus.emit(CharacterLevelChanged(level_info=level_info))
-                    continue
-                instance_info = self._parser.parse_instance(line)
-                if instance_info is not None:
-                    location = self._catalog.resolve(instance_info.area_code)
-                    resolved = instance_info.model_copy(
-                        update={"area_display_name": location.display_name}
-                    )
-                    self._bus.emit(AreaEntered(instance_info=resolved))
+            self._current_stream = stream
+            try:
+                for line in stream.lines():
+                    if stream.is_closed():
+                        break
+                    if not line:
+                        continue
+                    local_area = self._parser.parse_local_area_entered(line)
+                    if local_area is not None:
+                        self._bus.emit(LocalAreaEntered(area_name=local_area))
+                        continue
+                    party_name = self._parser.parse_party_joined(line)
+                    if party_name is not None:
+                        self._bus.emit(PartyMemberJoined(name=party_name))
+                        continue
+                    afk_status = self._parser.parse_afk_event(line)
+                    if afk_status is not None:
+                        self._bus.emit(AFKStatusChanged(status=afk_status))
+                        continue
+                    level_info = self._parser.parse_level(line)
+                    if level_info is not None:
+                        self._bus.emit(CharacterLevelChanged(level_info=level_info))
+                        continue
+                    instance_info = self._parser.parse_instance(line)
+                    if instance_info is not None:
+                        location = self._catalog.resolve(instance_info.area_code)
+                        resolved = instance_info.model_copy(
+                            update={"area_display_name": location.display_name}
+                        )
+                        self._bus.emit(AreaEntered(instance_info=resolved))
+            finally:
+                stream.close()
+                self._current_stream = None
         except (asyncio.CancelledError, KeyboardInterrupt):
             _log.info("orchestrator_shutdown")
         finally:
@@ -148,6 +158,21 @@ class Orchestrator:
         """Continuous monitor loop — runs until cancelled or interrupted."""
         try:
             while True:
+                if self._current_stream is not None and self._current_stream.is_closed():
+                    break
                 self.run_once()
+                if self._current_stream is not None and self._current_stream.is_closed():
+                    break
         except (asyncio.CancelledError, KeyboardInterrupt):
             _log.info("orchestrator_stopped")
+
+    def stop(self) -> None:
+        """Thread-safe shutdown signal — called from the tray Quit thread.
+
+        Closes the active stream (if any). The sync ``for line in stream.lines()``
+        loop exits cleanly on the next ``is_closed()`` check, then the ``finally``
+        block tears down the publisher and event loop.
+        """
+        stream = self._current_stream
+        if stream is not None:
+            stream.close()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import threading
 import time
 from asyncio import AbstractEventLoop, QueueFull
 from collections.abc import AsyncIterator
@@ -68,6 +69,8 @@ class WatchdogLogStream:
         self._handler = _LogFileHandler(self)
         self.dropped_non_domain_count: int = 0
         self._last_drop_warn_time: float = 0.0
+        self._is_closed: bool = False
+        self._close_lock = threading.Lock()
 
         # Seek to EOF on start
         if log_path.exists():
@@ -81,6 +84,20 @@ class WatchdogLogStream:
     def stop(self) -> None:
         self._observer.stop()
         self._observer.join()
+
+    def close(self) -> None:
+        """Idempotent, thread-safe close. Safe to call from any thread."""
+        with self._close_lock:
+            if self._is_closed:
+                return
+            self._is_closed = True
+        self._observer.stop()
+        self._observer.join()
+        # Wake any pending await on the queue so consumers can observe is_closed():
+        self._loop.call_soon_threadsafe(self._queue.put_nowait, "")
+
+    def is_closed(self) -> bool:
+        return self._is_closed
 
     def _read_new_lines(self) -> None:
         """Called from the watchdog observer thread. Reads new bytes and schedules enqueues."""

@@ -14,6 +14,10 @@ Commands:
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
+import sys
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -48,7 +52,7 @@ class _SyncLineIterator:
     """Adapter: drains WatchdogLogStream's async queue into a sync Iterator[str].
 
     Lives in the composition root because LogStream is a sync Protocol but the
-    Watchdog adapter speaks asyncio. Owns the start/stop of the observer.
+    Watchdog adapter speaks asyncio. Owns the start/close of the observer.
     """
 
     def __init__(self, stream: WatchdogLogStream, loop: asyncio.AbstractEventLoop) -> None:
@@ -59,10 +63,18 @@ class _SyncLineIterator:
     def lines(self) -> Iterator[str]:
         try:
             while True:
+                if self._stream.is_closed():
+                    return
                 line = self._loop.run_until_complete(self._stream._queue.get())
                 yield line
         finally:
-            self._stream.stop()
+            self._stream.close()
+
+    def close(self) -> None:
+        self._stream.close()
+
+    def is_closed(self) -> bool:
+        return self._stream.is_closed()
 
 
 def _version_callback(value: bool) -> None:
@@ -130,6 +142,104 @@ def once() -> None:
     configure_logging(settings)
     orch = build_orchestrator(settings)
     orch.run_once()
+
+
+def _resolve_tray_exe_path() -> Path:
+    """Pick the executable path the Startup shortcut should target.
+
+    Under PyInstaller ``--onefile``, ``sys.executable`` IS the bundled .exe and
+    the correct target. In a normal ``pip install`` flow, ``sys.executable`` is
+    the Python interpreter (Startup would launch ``python.exe`` with no args);
+    use ``sys.argv[0]`` instead — it points at the installed ``poe2-rpc``
+    console script.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable)
+    return Path(sys.argv[0])
+
+
+def _open_log_file(settings: AppSettings) -> None:
+    detector = PsutilGameDetector(settings)
+    try:
+        path = detector.log_path()
+    except Exception:  # noqa: BLE001 — tray must not crash on missing game
+        return
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path)])
+
+
+def _restart_self() -> None:
+    """Re-exec the current process with the same argv."""
+    os.execv(sys.executable, [sys.executable, *sys.argv])
+
+
+@app.command()
+def tray(
+    quiet: bool = typer.Option(False, "--quiet", help="Suppress console output."),
+) -> None:
+    """Run orchestrator in background; show tray icon for control."""
+    try:
+        from poe2_rpc.infrastructure.tray import TrayController
+    except ImportError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    settings = AppSettings()
+    if not quiet:
+        configure_logging(settings)
+    orch = build_orchestrator(settings)
+
+    # orch.run() is sync (closeable-stream design — see ADR). It owns its own
+    # event loop per run_once() call; no asyncio.run wrapper here.
+    worker = threading.Thread(target=orch.run, daemon=True)
+    worker.start()
+
+    tray_controller_holder: list[TrayController] = []
+
+    def _on_quit() -> None:
+        orch.stop()
+        if tray_controller_holder:
+            tray_controller_holder[0].stop()
+
+    tray_controller = TrayController(
+        on_open_log=lambda: _open_log_file(settings),
+        on_restart=_restart_self,
+        on_quit=_on_quit,
+        icon_path=None,
+    )
+    tray_controller_holder.append(tray_controller)
+    tray_controller.run()
+
+
+@app.command(name="install-autostart")
+def install_autostart() -> None:
+    """Create Windows Startup shortcut that boots the tray on login."""
+    try:
+        from poe2_rpc.infrastructure.autostart import install_startup_shortcut
+    except ImportError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    exe = _resolve_tray_exe_path()
+    target = install_startup_shortcut(exe, target_args=["tray", "--quiet"])
+    typer.echo(f"Installed: {target}")
+
+
+@app.command(name="uninstall-autostart")
+def uninstall_autostart() -> None:
+    """Remove the Windows Startup shortcut if present."""
+    try:
+        from poe2_rpc.infrastructure.autostart import uninstall_startup_shortcut
+    except ImportError as e:
+        typer.secho(str(e), fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1) from e
+
+    removed = uninstall_startup_shortcut()
+    typer.echo("Removed." if removed else "Nothing to remove.")
 
 
 @app.command(name="validate-config")

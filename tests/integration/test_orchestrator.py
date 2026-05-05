@@ -37,9 +37,19 @@ class FakeGameDetector:
 class FakeLogStream:
     def __init__(self, lines: list[str]) -> None:
         self._lines = lines
+        self._closed = False
 
     def lines(self) -> Iterator[str]:
-        yield from self._lines
+        for line in self._lines:
+            if self._closed:
+                return
+            yield line
+
+    def close(self) -> None:
+        self._closed = True
+
+    def is_closed(self) -> bool:
+        return self._closed
 
 
 class FakeLogParser:

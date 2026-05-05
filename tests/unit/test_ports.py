@@ -28,6 +28,12 @@ class _ConcreteLogStream:
     def lines(self) -> Iterator[str]:
         yield "line"
 
+    def close(self) -> None:
+        pass
+
+    def is_closed(self) -> bool:
+        return False
+
 
 class _ConcreteLogParser:
     def parse_level(self, line: str) -> LevelInfo | None:
