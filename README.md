@@ -46,6 +46,14 @@ Download the latest release here:**
 - Rich Discord presence for **Path of Exile 2**
 - Automatically detects character class, ascendancy, zone, and level
 - Displays an image for each class
+- Detects both the **Steam** (`PathOfExileSteam.exe`) and the **official**
+  (`PathOfExile.exe`) clients
+- **Owner auto-pin** so the RPC tracks the player who launched the script,
+  not whichever party member appears in the log first
+- **AFK / DND status** with `[AFK]` suffix and a temporary small-image override
+  that restores the prior icon when AFK clears
+- Optional **system-tray background service** with a Windows Startup-folder
+  shortcut for autostart on login
 
 ---
 
@@ -53,9 +61,9 @@ Download the latest release here:**
 
 - [x] Support for custom images (all classes and ascendancies)
 - [x] Launch as background service when game starts (tray + Windows Startup shortcut)
-- [ ] Add support for the official PoE2 client
-- [ ] Detect the player who started the script (avoid party conflicts)
-- [ ] Show AFK status
+- [x] Add support for the official PoE2 client
+- [x] Detect the player who started the script (avoid party conflicts)
+- [x] Show AFK status
 
 ---
 

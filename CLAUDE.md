@@ -102,10 +102,17 @@ Both target the Steam-build log format. Defined in `src/poe2_rpc/infrastructure/
 
 ## Open work (from README)
 
-- [ ] Launch as a background service when the game starts.
-- [ ] Support the official PoE2 client (currently Steam-only via the hardcoded `PathOfExileSteam.exe` process name).
-- [ ] Detect which player started the script (avoid party-conflict mis-detection).
-- [ ] Show AFK status.
+All four originally-listed README items have been implemented locally on
+stacked feature branches and submitted as draft PRs upstream
+(`ezbooz/Path-Of-Exile-2-RPC` #6, #7, #8, #9):
+
+- [x] Support the official PoE2 client (`PathOfExile.exe` alongside Steam).
+- [x] Detect which player started the script (owner auto-pin).
+- [x] Show AFK status (with `[AFK]` suffix + small-image override + restore).
+- [x] Launch as a background service (pystray tray + Windows Startup shortcut).
+
+Remaining work: end-of-campaign Windows live-smoke screenshots to flip the
+4 upstream draft PRs to ready-for-review.
 
 ## See also
 
