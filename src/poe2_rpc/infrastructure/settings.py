@@ -14,11 +14,12 @@ import os
 import sys
 import tomllib
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import PrivateAttr
+from pydantic import PrivateAttr, field_validator
 from pydantic_settings import (
     BaseSettings,
+    NoDecode,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     TomlConfigSettingsSource,
@@ -41,7 +42,13 @@ class AppSettings(BaseSettings):
     )
 
     discord_app_id: str = "1315800372207419504"
-    process_name: str = "PathOfExileSteam.exe"
+    # NoDecode: env-source must pass the raw POE2RPC_PROCESS_NAME string through
+    # to the validator below so a legacy single-string value is coerced to
+    # a one-element list instead of failing JSON decoding for `list[str]`.
+    process_name: Annotated[list[str], NoDecode] = [
+        "PathOfExileSteam.exe",
+        "PathOfExile.exe",
+    ]
     locations_url: str | None = None
     log_stream_enqueue_deadline_seconds: float = 2.0
     log_stream_queue_maxsize: int = 1000
@@ -52,6 +59,16 @@ class AppSettings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
 
     _toml_file: str = PrivateAttr(default="")
+
+    @field_validator("process_name", mode="before")
+    @classmethod
+    def _coerce_string_to_list(cls, v: object) -> object:
+        # Back-compat: legacy POE2RPC_PROCESS_NAME=Foo.exe (single string) is
+        # accepted and promoted to a single-element list so existing user
+        # configs keep working after the str -> list[str] type change.
+        if isinstance(v, str):
+            return [v]
+        return v
 
     def __init__(self, _toml_file: str = "", **kwargs: Any) -> None:
         super().__init__(**kwargs)

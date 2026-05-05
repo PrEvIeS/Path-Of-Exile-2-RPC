@@ -50,7 +50,7 @@ class PsutilGameDetector:
         for proc in self._process_iter(["name", "exe"]):
             try:
                 info = proc.info
-                if info.get("name") == self._settings.process_name:
+                if info.get("name") in self._settings.process_name:
                     exe = info.get("exe")
                     if exe:
                         yield Path(exe).parent / "logs" / "Client.txt"

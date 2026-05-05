@@ -14,7 +14,7 @@ from poe2_rpc.infrastructure.settings import AppSettings
 def test_settings_defaults() -> None:
     s = AppSettings()
     assert s.discord_app_id == "1315800372207419504"
-    assert s.process_name == "PathOfExileSteam.exe"
+    assert s.process_name == ["PathOfExileSteam.exe", "PathOfExile.exe"]
     assert s.locations_url is None
     assert s.log_stream_enqueue_deadline_seconds == 2.0
     assert s.log_stream_queue_maxsize == 1000
@@ -53,3 +53,23 @@ def test_settings_init_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
     s = AppSettings(connect_retry_attempts=2)
     assert s.connect_retry_attempts == 2
+
+
+def test_process_name_string_env_coerced_to_list(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Back-compat: legacy single-string env var must be promoted to a
+    # single-element list so users with POE2RPC_PROCESS_NAME=Foo.exe in
+    # an existing config keep working after the type change to list[str].
+    monkeypatch.setenv("POE2RPC_PROCESS_NAME", "Foo.exe")
+    reload(settings_mod)
+    s = settings_mod.AppSettings()
+    assert s.process_name == ["Foo.exe"]
+
+
+def test_process_name_init_string_coerced_to_list() -> None:
+    s = AppSettings(process_name="OnlyOne.exe")  # type: ignore[arg-type]
+    assert s.process_name == ["OnlyOne.exe"]
+
+
+def test_process_name_init_list_passes_through() -> None:
+    s = AppSettings(process_name=["A.exe", "B.exe"])
+    assert s.process_name == ["A.exe", "B.exe"]
