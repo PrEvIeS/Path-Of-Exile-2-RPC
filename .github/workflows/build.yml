@@ -16,6 +16,9 @@ on:
 permissions:
   contents: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -24,8 +27,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dorny/paths-filter@v3
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         id: filter
         with:
           filters: |
