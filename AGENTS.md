@@ -1,58 +1,119 @@
-<!-- Generated: 2026-05-04 | Updated: 2026-05-04 -->
+<!-- Generated: 2026-05-04 | Updated: 2026-05-05 -->
 
 # Path-Of-Exile-2-RPC
 
 ## Purpose
-A small, single-script Python utility that provides Discord Rich Presence integration for Path of Exile 2. The tool locates the running `PathOfExileSteam.exe` process, tails its `Client.txt` log, parses level-up and zone-generation events, and pushes a live presence update (character/class/ascendancy/zone) to Discord via `pypresence`.
+A Discord Rich Presence integration for Path of Exile 2. Detects the running game process (Steam **and** official client), tails its `Client.txt` log, parses level-up + zone-generation + AFK events, and pushes a live presence update (character / class / ascendancy / zone / AFK status) to Discord via `pypresence`.
 
-The whole runtime is intentionally one file (`main.py`) so it can be packaged into a single Windows `.exe` via PyInstaller in CI.
+The runtime is a hexagonal Python package at `src/poe2_rpc/` with `domain/`, `application/`, `infrastructure/`, and `cli.py` (composition root). The Typer app in `cli.py` is the entrypoint, exposed as the `poe2-rpc` console script and `python -m poe2_rpc`. The legacy single-file `main.py` at the repo root is the upstream-compatible form: it carries the same features re-encoded as module globals + inline branches and is the surface used by the `ezbooz/Path-Of-Exile-2-RPC` upstream PRs.
+
+End users grab a prebuilt Windows `.exe` from GitHub Releases (built by `.github/workflows/build.yml` via PyInstaller `--onefile` against `PathOfExile2DiscordRPC.spec`).
 
 ## Key Files
 | File | Description |
 |------|-------------|
-| `main.py` | Entire application: log discovery, regex parsing, RPC connect, monitor loop. Discord app ID `1315800372207419504`. |
-| `locations.json` | Mapping of internal area codes (e.g. `G1_1`) to player-facing zone names (e.g. `The Riverbank`). Loaded from disk if present, otherwise fetched from the GitHub `main` branch on first run. |
-| `requirements.txt` | Runtime dependencies: `psutil` (process discovery), `pypresence` (Discord IPC). |
-| `README.md` | User-facing install/run instructions. |
-| `LICENSE` | MIT license. |
-| `.gitignore` | Ignores `.idea/` and `__pycache__/`. |
+| `main.py` | Upstream-form single-file runtime (re-encoded hexagonal features as module globals + inline branches). Backport target for `ezbooz/Path-Of-Exile-2-RPC` PRs #6–#9. |
+| `pyproject.toml` | Package metadata, dev/tray extras, Typer console script, ruff/mypy/import-linter config. |
+| `PathOfExile2DiscordRPC.spec` | PyInstaller `--onefile` spec; bundles `src/poe2_rpc/locations.json`. |
+| `locations.json` | Human-edit source-of-truth for area-code → display-name mapping; mirrored into `src/poe2_rpc/locations.json` for packaging. |
+| `requirements.txt` | Upstream-form runtime deps; mirrors the runtime subset of `pyproject.toml`. |
+| `README.md` / `README.ru.md` / `README.ua.md` | End-user instructions in EN / RU / UA. |
+| `CLAUDE.md` | Project instructions for Claude Code. |
+| `LICENSE` | MIT. |
+| `.gitignore` | Ignores caches, build artifacts, `.omc/state/`, `.idea/`. |
 
 ## Subdirectories
 | Directory | Purpose |
 |-----------|---------|
-| `.github/` | CI workflow + issue templates (see `.github/AGENTS.md`) |
+| `src/poe2_rpc/` | Hexagonal package (see `src/poe2_rpc/AGENTS.md`). |
+| `tests/` | Unit + integration test suites (see `tests/AGENTS.md`). |
+| `.github/` | CI workflows + issue templates (see `.github/AGENTS.md`). |
+| `.omc/` | OMC planning artifacts: `.omc/specs/` (deep-interview specs) and `.omc/plans/` (ralplan consensus plans) are tracked; `.omc/state/` is gitignored. |
+| `.beads/` | Beads issue-tracker state (`issues.jsonl` is the file-based backup). |
 
 ## For AI Agents
 
 ### Working In This Directory
-- Keep the runtime to `main.py`. The CI build (`.github/workflows/build.yml`) only triggers on changes to `main.py`, and PyInstaller is invoked as `pyinstaller --onefile --name PathOfExile2DiscordRPC main.py`. Splitting code into modules requires updating both the path filter and the PyInstaller call in lockstep.
-- The `regex_level` pattern is `: (\w+) \(([\w\s]+)\) is now level (\d+)` and `regex_instance` is `Generating level (\d+) area "([^"]+)" with seed (\d+)`. Both target the literal log format produced by the Steam build of PoE2; verify against a real `Client.txt` sample before changing them.
-- When adding a new ascendancy: extend `ClassAscendency` enum (value must match the in-game string exactly), add the entry to `ClassAscendency.get_class()`, and add it to the parent `CharacterClass.get_ascendencies()` list. Reference commit: `fe9c494` ("Add new character classes: Smith of Kitava, Lich, and Tactician").
-- The `small_image` field is derived as `ascension_class.lower().replace(" ", "_")`. Discord asset keys must therefore be lowercase + underscores (commit `5ae14e6` enforced this). Asset names that don't match this convention silently fall back to no image.
-- `locations.json` is fetched from `https://raw.githubusercontent.com/ezbooz/Path-Of-Exile-2-RPC/refs/heads/main/locations.json` only when the local file is missing. If you change the schema, ship the updated `locations.json` in the same commit so existing installs upgrade on next launch.
-- `monitor_log()` calls `log_file.readlines()` after `seek(0, 2)` and sleeps 5s — a deliberate append-only poll. The cadence matches how PoE2 buffers its log; preserve this approach.
-- Process discovery hardcodes `PathOfExileSteam.exe`. Adding support for the official client (see README) means another explicit process-name check, not a regex.
+- **Hexagonal layering is non-negotiable.** `lint-imports` enforces `domain ← application ← infrastructure ← cli`. Only `cli.py` may import from `infrastructure`. AST guards in `tests/unit/test_layering.py` and `test_orchestrator_layering.py` back this up.
+- **Frozen pydantic v2 VOs in `domain/`** — no `dataclass`, no mutable state. `tests/unit/test_no_mutable_state.py` AST guard fails CI on violations.
+- **`mypy --strict` is mandatory.** 4-space indent, type hints on every signature.
+- **`structlog` not `logging`.** Use `bind_contextvars(username=, character_class=, area=)` so events carry context through the call graph.
+- **`pathlib.Path` + explicit `encoding="utf-8"`** for file I/O. Bundled assets via `importlib.resources.files("poe2_rpc")` — never cwd-relative.
+- **Tenacity for retries**, with split policies for connect vs publish (see `src/poe2_rpc/infrastructure/presence.py`).
+- **The dual-form (hexagonal + main.py) is intentional.** When changing both, treat the cross-form contract as the state-transition table, not the class hierarchy. See memory `feedback_backport_divergence_pattern.md`.
+- **Optional extras pattern:** hexagonal modules import third-party deps at module top behind `try import / except ImportError as e: raise ... from e`. Upstream-form lazy-imports inside helpers. See memory `feedback_optional_deps_backport_idiom.md`.
 
 ### Testing Requirements
-- No automated test suite. Manual verification: launch the game, run `python main.py`, confirm Discord shows the expected presence; kill/relaunch Discord to exercise `rpc_connect` (5 retries with `time.sleep(2 ** retries)` backoff).
-- No linter/formatter is enforced. Match existing style: 4-space indent, type hints on signatures, `logging` over `print`.
+The full gate (mirrors CI):
+
+```bash
+pytest tests -ra
+mypy --strict src/poe2_rpc
+lint-imports
+ruff check src tests
+ruff format --check src tests
+```
+
+143 tests pass on `feature/background-launcher`; new code should not lower this baseline.
 
 ### Common Patterns
-- Log parsers return `Optional[Dict[str, str]]`; callers check truthiness.
-- Module-level `logging` (configured at import) is used everywhere instead of `print`.
-- File I/O uses `pathlib.Path` and explicit `encoding="utf-8"`.
-- Retry loops use exponential backoff `time.sleep(2 ** retries)` (see `rpc_connect`).
+- Composition root in `cli.py::build_orchestrator(settings)` wires Protocols → adapters.
+- All Typer command callbacks return `None`; errors raise `typer.Exit(code=...)`.
+- Optional-deps imports are deferred to inside the function body so headless installs never hit the import.
+- Domain events are nouns-in-past-tense (`CharacterLevelChanged`, `AreaEntered`, `AFKStatusChanged`).
 
 ## Dependencies
 
+### Internal
+- `domain/` — pure VOs, events, Protocols (see `src/poe2_rpc/domain/AGENTS.md`).
+- `application/` — orchestration, bus, throttle, handlers (see `src/poe2_rpc/application/AGENTS.md`).
+- `infrastructure/` — psutil, watchdog, pypresence, pydantic-settings, structlog, pystray, pylnk3 adapters (see `src/poe2_rpc/infrastructure/AGENTS.md`).
+
 ### External
-- `psutil` — iterating processes to find `PathOfExileSteam.exe` and resolve its install directory.
-- `pypresence` — Discord IPC client for the Rich Presence API.
-- Stdlib: `datetime`, `json`, `logging`, `os`, `re`, `time`, `random`, `pathlib`, `enum`, `urllib.request`.
+- `typer` — CLI framework.
+- `psutil` — process discovery.
+- `watchdog` — `ReadDirectoryChangesW` log tailing.
+- `pypresence` — Discord IPC.
+- `pydantic` v2 + `pydantic-settings` — VOs, env-var coercion.
+- `structlog` — structured logging.
+- `tenacity` — split-policy retries.
+- `pystray` + `Pillow` + `pylnk3` — optional `[tray]` extra (Windows tray + Startup shortcut).
 
 ### Runtime
 - Discord desktop client must be running and authorized for app ID `1315800372207419504`.
-- Path of Exile 2 (Steam build) must be installed and running.
+- Path of Exile 2 (Steam **or** official client) must be installed and running.
+
+## Build & Test
+
+```bash
+pip install -e ".[dev]"
+poe2-rpc run                            # continuous monitor loop
+poe2-rpc once                           # single log-stream pass
+poe2-rpc validate-config --no-discord   # smoke check (no Discord IPC)
+
+# Optional tray service (Windows)
+pip install "poe2-rpc[tray]"
+poe2-rpc tray
+poe2-rpc install-autostart
+poe2-rpc uninstall-autostart
+```
+
+Optional config: `%APPDATA%\poe2-rpc\config.toml` on Windows, `~/.config/poe2-rpc/config.toml` on macOS/Linux for cross-platform dev. Defaults work without one — see `src/poe2_rpc/infrastructure/settings.py::AppSettings`.
+
+## CI / Release flow
+
+Push to `main` touching `src/**`, `pyproject.toml`, `locations.json`, `PathOfExile2DiscordRPC.spec`, or the workflow → `.github/workflows/build.yml` runs lint+test on `ubuntu-latest`, then build on `windows-latest`. The build job runs `pyinstaller PathOfExile2DiscordRPC.spec`, then deep-smokes the `.exe` with `validate-config --no-discord`, then a cold-start benchmark (continue-on-error: budget breach files a follow-up bd issue, doesn't block release). A timestamp tag (`vYYYYMMDD-HHMMSS`) is created and pushed; the release job uploads `PathOfExile2DiscordRPC.exe` as a GitHub Release asset.
+
+## Upstream PR campaign
+
+Four small, sequential PRs against `ezbooz/Path-Of-Exile-2-RPC` carry the same feature work to upstream's single-file form:
+
+- **#6** Official PoE2 client support (`process_name: list[str]`).
+- **#7** Owner detection via auto-pin (`OwnerTracker` re-encoded as module globals).
+- **#8** AFK status with `small_image_override`.
+- **#9** Background launcher (pystray tray + Windows Startup shortcut).
+
+All four are open as drafts pending end-of-campaign Windows live-smoke. See memory `project_upstream_pr_campaign.md`.
 
 ## Non-Interactive Shell Commands
 
