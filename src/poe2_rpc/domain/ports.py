@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Iterator, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterator, Protocol, runtime_checkable
 
 from poe2_rpc.domain.events import DomainEvent
 from poe2_rpc.domain.locations import Location
 from poe2_rpc.domain.models import InstanceInfo, LevelInfo
+
+if TYPE_CHECKING:
+    Handler = Callable[[DomainEvent], Awaitable[None]]
 
 
 @runtime_checkable
@@ -28,16 +31,23 @@ class LogParser(Protocol):
 
 @runtime_checkable
 class PresencePublisher(Protocol):
-    def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None: ...
+    async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None: ...
     def close(self) -> None: ...
 
 
 @runtime_checkable
 class EventBus(Protocol):
     def emit(self, event: DomainEvent) -> None: ...
-    def subscribe(self, handler: object) -> None: ...
+    def subscribe(self, event_type: type[DomainEvent], handler: Callable[[DomainEvent], Awaitable[None]]) -> None: ...
 
 
 @runtime_checkable
 class LocationCatalogPort(Protocol):
     def resolve(self, area_code: str) -> Location: ...
+
+
+@runtime_checkable
+class Settings(Protocol):
+    throttle_window_seconds: float
+    connect_retry_attempts: int
+    publish_retry_attempts: int
