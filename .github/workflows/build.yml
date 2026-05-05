@@ -25,8 +25,8 @@ jobs:
     outputs:
       build_relevant: ${{ steps.filter.outputs.build_relevant }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: dorny/paths-filter@v3
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -42,7 +42,7 @@ jobs:
     needs: changes
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -81,7 +81,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -138,13 +138,13 @@ jobs:
 
     steps:
       - name: Download executable
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: executable
           path: dist
 
       - name: Create Release and upload asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
