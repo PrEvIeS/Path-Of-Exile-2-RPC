@@ -68,6 +68,10 @@ class FakeLogParser:
 class FakePresencePublisher:
     def __init__(self) -> None:
         self.published: list[tuple[LevelInfo | None, InstanceInfo | None]] = []
+        self.connected: bool = False
+
+    async def connect(self) -> None:
+        self.connected = True
 
     async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None:
         self.published.append((level_info, instance_info))

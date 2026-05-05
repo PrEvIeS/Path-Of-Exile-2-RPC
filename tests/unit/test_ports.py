@@ -37,6 +37,9 @@ class _ConcreteLogParser:
 
 
 class _ConcretePresencePublisher:
+    async def connect(self) -> None:
+        pass
+
     async def publish(self, level_info: LevelInfo | None, instance_info: InstanceInfo | None) -> None:
         pass
 

@@ -6,7 +6,23 @@ import json
 
 import httpx
 
+from poe2_rpc.domain.locations import LocationCatalog
 from poe2_rpc.infrastructure.settings import AppSettings
+
+
+def load_bundled_catalog() -> LocationCatalog:
+    """Load the bundled locations.json into the domain LocationCatalog.
+
+    Used by the composition root and by `validate-config` to prove that the
+    bundled JSON is present and parsable without contacting Discord.
+    """
+    text = (
+        importlib.resources.files("poe2_rpc")
+        .joinpath("locations.json")
+        .read_text(encoding="utf-8")
+    )
+    data = json.loads(text)
+    return LocationCatalog(areas=dict(data.get("areas", {})))
 
 
 class BundledLocationCatalog:

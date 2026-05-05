@@ -31,3 +31,15 @@ def parse_instance_event(line: str) -> InstanceInfo | None:
         area_display_name=m.group(2),
         seed=int(m.group(3)),
     )
+
+
+class RegexLogParser:
+    """LogParser port adapter wrapping the module-level parse_*_event functions."""
+
+    @staticmethod
+    def parse_level(line: str) -> LevelInfo | None:
+        return parse_level_event(line)
+
+    @staticmethod
+    def parse_instance(line: str) -> InstanceInfo | None:
+        return parse_instance_event(line)

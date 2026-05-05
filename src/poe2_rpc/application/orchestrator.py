@@ -80,6 +80,7 @@ class Orchestrator:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
+            loop.run_until_complete(self._publisher.connect())
             log_path = self._detector.log_path()
             stream = self._factory(log_path, loop)
             for line in stream.lines():
