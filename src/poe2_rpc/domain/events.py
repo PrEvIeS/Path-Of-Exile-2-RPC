@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from poe2_rpc.domain.models import InstanceInfo, LevelInfo
+from poe2_rpc.domain.models import AFKStatus, InstanceInfo, LevelInfo
 
 
 class DomainEvent(BaseModel):
@@ -37,3 +37,9 @@ class PartyMemberJoined(DomainEvent):
     """Emitted on `<name> has joined the area.` — signals another player is in the same instance."""
 
     name: str
+
+
+class AFKStatusChanged(DomainEvent):
+    """Emitted on `: AFK mode is now ON. Autoreply "..."` and OFF variants (also DND)."""
+
+    status: AFKStatus

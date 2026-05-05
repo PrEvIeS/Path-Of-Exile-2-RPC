@@ -67,12 +67,20 @@ class PypresencePublisher:
         self,
         level_info: LevelInfo | None,
         instance_info: InstanceInfo | None,
+        *,
+        afk_on: bool = False,
+        small_image_override: str | None = None,
     ) -> None:
         """Publish a Rich Presence update with its own 3× retry (independent of connect)."""
         if self._presence is None:
             raise RuntimeError("publish() called before connect()")
 
-        kwargs = self._build_update_kwargs(level_info, instance_info)
+        kwargs = self._build_update_kwargs(
+            level_info,
+            instance_info,
+            afk_on=afk_on,
+            small_image_override=small_image_override,
+        )
         presence = self._presence
 
         @retry(
@@ -90,6 +98,9 @@ class PypresencePublisher:
     def _build_update_kwargs(
         level_info: LevelInfo | None,
         instance_info: InstanceInfo | None,
+        *,
+        afk_on: bool = False,
+        small_image_override: str | None = None,
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {
             "start": int(datetime.now(tz=UTC).timestamp()),
@@ -102,8 +113,15 @@ class PypresencePublisher:
             kwargs["details"] = details
             asc = level_info.ascension_class or level_info.base_class
             kwargs["small_image"] = asc.lower().replace(" ", "_")
+        if small_image_override is not None:
+            kwargs["small_image"] = small_image_override
         if instance_info is not None:
-            kwargs["state"] = f"In: {instance_info.area_display_name} (Lvl {instance_info.level})"
+            state = f"In: {instance_info.area_display_name} (Lvl {instance_info.level})"
+            if afk_on:
+                state += " [AFK]"
+            kwargs["state"] = state
+        elif afk_on:
+            kwargs["state"] = "[AFK]"
         return kwargs
 
     def close(self) -> None:

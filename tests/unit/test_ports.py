@@ -5,7 +5,7 @@ from pathlib import Path
 
 from poe2_rpc.domain.events import DomainEvent
 from poe2_rpc.domain.locations import Location
-from poe2_rpc.domain.models import InstanceInfo, LevelInfo
+from poe2_rpc.domain.models import AFKStatus, InstanceInfo, LevelInfo
 from poe2_rpc.domain.ports import (
     EventBus,
     GameDetector,
@@ -42,6 +42,9 @@ class _ConcreteLogParser:
     def parse_party_joined(self, line: str) -> str | None:
         return None
 
+    def parse_afk_event(self, line: str) -> AFKStatus | None:
+        return None
+
 
 class _ConcretePresencePublisher:
     async def connect(self) -> None:
@@ -51,6 +54,9 @@ class _ConcretePresencePublisher:
         self,
         level_info: LevelInfo | None,
         instance_info: InstanceInfo | None,
+        *,
+        afk_on: bool = False,
+        small_image_override: str | None = None,
     ) -> None:
         pass
 

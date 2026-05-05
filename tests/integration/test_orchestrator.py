@@ -11,7 +11,7 @@ from poe2_rpc.application.handlers import MutableState
 from poe2_rpc.application.orchestrator import Orchestrator
 from poe2_rpc.application.throttle import PresenceThrottle
 from poe2_rpc.domain.locations import Location
-from poe2_rpc.domain.models import InstanceInfo, LevelInfo
+from poe2_rpc.domain.models import AFKStatus, InstanceInfo, LevelInfo
 from poe2_rpc.domain.ports import LogStream
 
 # --- Fakes ---
@@ -75,10 +75,18 @@ class FakeLogParser:
             return line[len("PARTY:") :]
         return None
 
+    def parse_afk_event(self, line: str) -> AFKStatus | None:
+        if line.startswith("AFK_ON:"):
+            return AFKStatus(mode="AFK", on=True, autoreply=line[len("AFK_ON:") :])
+        if line == "AFK_OFF":
+            return AFKStatus(mode="AFK", on=False, autoreply=None)
+        return None
+
 
 class FakePresencePublisher:
     def __init__(self) -> None:
         self.published: list[tuple[LevelInfo | None, InstanceInfo | None]] = []
+        self.publish_kwargs: list[dict[str, object]] = []
         self.connected: bool = False
 
     async def connect(self) -> None:
@@ -88,8 +96,12 @@ class FakePresencePublisher:
         self,
         level_info: LevelInfo | None,
         instance_info: InstanceInfo | None,
+        *,
+        afk_on: bool = False,
+        small_image_override: str | None = None,
     ) -> None:
         self.published.append((level_info, instance_info))
+        self.publish_kwargs.append({"afk_on": afk_on, "small_image_override": small_image_override})
 
     def close(self) -> None:
         pass

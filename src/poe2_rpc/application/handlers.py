@@ -7,6 +7,7 @@ import structlog.contextvars
 
 from poe2_rpc.application.throttle import PresenceThrottle
 from poe2_rpc.domain.events import (
+    AFKStatusChanged,
     AreaEntered,
     CharacterLevelChanged,
     LocalAreaEntered,
@@ -18,6 +19,8 @@ from poe2_rpc.domain.ports import PresencePublisher
 
 _log = structlog.get_logger(__name__)
 
+_AFK_SMALL_IMAGE = "afk"
+
 
 class MutableState:
     """Shared mutable state threaded through handlers so each can see the other's last value."""
@@ -28,6 +31,11 @@ class MutableState:
         self.owner_tracker: OwnerTracker = (
             owner_tracker if owner_tracker is not None else OwnerTracker.unknown()
         )
+        self.afk_on: bool = False
+        # Snapshot of small_image at the moment AFK turned ON; restored on OFF.
+        # Decoupled from level_info so a level-up *during* AFK doesn't leak
+        # the new ascendency into the post-AFK presence.
+        self.prior_small_image: str | None = None
 
 
 def _format_details(level_info: LevelInfo) -> str:
@@ -36,6 +44,21 @@ def _format_details(level_info: LevelInfo) -> str:
         details += f" | {level_info.ascension_class}"
     details += f" - Lvl {level_info.level})"
     return details
+
+
+def _small_image_for(level_info: LevelInfo | None) -> str | None:
+    """Mirror PypresencePublisher._build_update_kwargs small_image derivation."""
+    if level_info is None:
+        return None
+    asc = level_info.ascension_class or level_info.base_class
+    return asc.lower().replace(" ", "_")
+
+
+def _afk_publish_kwargs(state: MutableState) -> dict[str, object]:
+    """When AFK is on, every publish must keep the [AFK] suffix and afk small_image."""
+    if state.afk_on:
+        return {"afk_on": True, "small_image_override": _AFK_SMALL_IMAGE}
+    return {"afk_on": False, "small_image_override": None}
 
 
 async def on_level_changed(
@@ -78,7 +101,11 @@ async def on_level_changed(
         level=li.level,
         details=_format_details(li),
     )
-    await publisher.publish(li, current_state.instance_info)
+    await publisher.publish(
+        li,
+        current_state.instance_info,
+        **_afk_publish_kwargs(current_state),  # type: ignore[arg-type]
+    )
 
 
 async def on_area_entered(
@@ -109,7 +136,11 @@ async def on_area_entered(
         area=ii.area_display_name,
         area_level=ii.level,
     )
-    await publisher.publish(current_state.level_info, ii)
+    await publisher.publish(
+        current_state.level_info,
+        ii,
+        **_afk_publish_kwargs(current_state),  # type: ignore[arg-type]
+    )
 
 
 async def on_local_area_entered(
@@ -147,3 +178,50 @@ async def on_party_joined(
             party_member=event.name,
             owner_state=current_state.owner_tracker.state.value,
         )
+
+
+async def on_afk_changed(
+    event: AFKStatusChanged,
+    *,
+    publisher: PresencePublisher,
+    current_state: MutableState,
+) -> None:
+    """`: AFK mode is now ON|OFF` (and DND variants).
+
+    On ON: snapshot the current small_image (derived from level_info) so a
+    subsequent level-up during the AFK window cannot leak its new icon.
+    On OFF: restore the snapshot via small_image_override; a None snapshot
+    (no level seen before AFK) cleanly omits the override.
+    """
+    status = event.status
+    structlog.contextvars.bind_contextvars(afk=status.on, afk_mode=status.mode)
+
+    if status.on:
+        current_state.prior_small_image = _small_image_for(current_state.level_info)
+        current_state.afk_on = True
+        _log.info(
+            "afk_on",
+            mode=status.mode,
+            snapshot=current_state.prior_small_image,
+            autoreply=status.autoreply,
+        )
+        await publisher.publish(
+            current_state.level_info,
+            current_state.instance_info,
+            afk_on=True,
+            small_image_override=_AFK_SMALL_IMAGE,
+        )
+        return
+
+    current_state.afk_on = False
+    restore = current_state.prior_small_image  # None when no level seen pre-AFK
+    _log.info("afk_off", mode=status.mode, restored=restore)
+    await publisher.publish(
+        current_state.level_info,
+        current_state.instance_info,
+        afk_on=False,
+        small_image_override=restore,
+    )
+    # Clear the snapshot AFTER the restore publish so a future AFK-ON that
+    # arrives before any new level event can capture a fresh snapshot.
+    current_state.prior_small_image = None

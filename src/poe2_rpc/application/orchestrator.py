@@ -16,6 +16,7 @@ import structlog
 from poe2_rpc.application.bus import AsyncioEventBus
 from poe2_rpc.application.handlers import (
     MutableState,
+    on_afk_changed,
     on_area_entered,
     on_level_changed,
     on_local_area_entered,
@@ -23,6 +24,7 @@ from poe2_rpc.application.handlers import (
 )
 from poe2_rpc.application.throttle import PresenceThrottle
 from poe2_rpc.domain.events import (
+    AFKStatusChanged,
     AreaEntered,
     CharacterLevelChanged,
     LocalAreaEntered,
@@ -94,6 +96,14 @@ class Orchestrator:
             PartyMemberJoined,
             functools.partial(on_party_joined, current_state=self._current_state),
         )
+        self._bus.subscribe(
+            AFKStatusChanged,
+            functools.partial(
+                on_afk_changed,
+                publisher=self._publisher,
+                current_state=self._current_state,
+            ),
+        )
 
     def run_once(self) -> None:
         """Process all lines from one log stream pass. Handles CancelledError/KeyboardInterrupt."""
@@ -111,6 +121,10 @@ class Orchestrator:
                 party_name = self._parser.parse_party_joined(line)
                 if party_name is not None:
                     self._bus.emit(PartyMemberJoined(name=party_name))
+                    continue
+                afk_status = self._parser.parse_afk_event(line)
+                if afk_status is not None:
+                    self._bus.emit(AFKStatusChanged(status=afk_status))
                     continue
                 level_info = self._parser.parse_level(line)
                 if level_info is not None:

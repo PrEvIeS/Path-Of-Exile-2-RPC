@@ -1,5 +1,7 @@
 """Frozen pydantic v2 value objects for the domain layer."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict
 
 
@@ -19,3 +21,11 @@ class InstanceInfo(BaseModel):
     area_display_name: str
     level: int
     seed: int
+
+
+class AFKStatus(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    mode: Literal["AFK", "DND"]
+    on: bool
+    autoreply: str | None = None
